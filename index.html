@@ -3,8 +3,199 @@
 <head>
     <meta charset="UTF-8">
     <title>XML Compare</title>
+    <script src="https://code.jquery.com/jquery-3.4.1.js" integrity="sha256-WpOohJOqMqqyKL9FccASB9O0KwACQJpFTUBLTYOVvVU=" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js"></script>
 </head>
 <body>
+    <div>
+        <table width="100%">
+            <tr>
+                <td colspan="2" style="text-align: center">
+                    <textarea name="text0" style="width: 50%" rows="20" id="inputText0" placeholder="Rules"></textarea>
+                </td>
+            </tr>
+            <tr>
+                <td>
+                    <textarea name="text1" style="width: 100%" rows="20" id="inputText1" placeholder="LHS XML"></textarea>
+                </td>
+                <td>
+                    <textarea name="text2" style="width: 100%" rows="20" id="inputText2" placeholder="RHS XML"></textarea>
+                </td>
+            </tr>
+            <tr>
+                <td colspan="2" style="text-align: center">
+                    <button  id="compareButton" onclick="PerformComparison()">
+                        <div class="compareButtonText">Compare!</div>
+                    </button>
+                </td>
+            </tr>
+        </table>
+    </div>
+    <div id="result">
 
+    </div>
+    <script>
+
+        function GetPosition(string, subString, index) {
+            return string.split(subString, index).join(subString).length;
+        }
+
+        function PerformComparison(){
+            var LHSXML = $('#inputText1')[0].value;
+            var RHSXML = $('#inputText2')[0].value;
+            var RULES = $('#inputText0')[0].value;
+
+            parser = new DOMParser();
+            LHSXML = $(parser.parseFromString(LHSXML,"text/xml"));
+            RHSXML = $(parser.parseFromString(RHSXML,"text/xml"));
+
+            var RESULT = $('#result');
+
+            RESULT.html("");
+
+            var rules_line_by_line = RULES.split("\n");
+
+
+
+            function ParseRule(rule){
+                var responeObj = {ruleExecutionResult:"",ruleExecutionComment:""};
+                try{
+                    var parameter1 = rule.substring(GetPosition(rule,"\"",1)+1,GetPosition(rule,"\"",2));
+                    if(rule.indexOf("Compare Value \"")==0){
+                        responeObj = XMLCompareValues(parameter1);
+                    }
+                    else if (rule.indexOf("Compare Array \"")==0){
+                        responeObj = XMLCompareArray(parameter1);
+                    }
+                    else{
+                        responeObj = {ruleExecutionResult:"No Rule Found Exception",ruleExecutionComment:"No Rule Matached. Please check for syntax errors."};
+                    }
+                }catch(err) {
+                    responeObj = {ruleExecutionResult:"Rule Execution Exception",ruleExecutionComment:err.message};
+                }
+                return responeObj;
+            }
+
+            function XMLComareArray(customPath){
+                var splitSingleNode = customPath.split("->");
+                var tmpLHSXML = LHSXML;
+                var tmpRHSXML = RHSXML;
+                for(var i=0;i<splitSingleNode.length;i++) {
+                    var singleNode = splitSingleNode[i];
+                    var nodeIdentifiedFalg = false;
+                    for (var j = 0; j < tmpLHSXML.children().length; j++) {
+                        if ($(tmpLHSXML).children()[j].tagName == singleNode) {
+                            tmpLHSXML = $($(tmpLHSXML).children()[j]);
+                            nodeIdentifiedFalg = true;
+                            break;
+                        }
+                    }
+                    if (!nodeIdentifiedFalg) {
+                        return {
+                            ruleExecutionResult: "Business Exception",
+                            ruleExecutionComment: "Node " + singleNode + " not found in LHS XML while navigating the path"
+                        }
+                    }
+                    nodeIdentifiedFalg = false;
+                    for(j=0;j<tmpRHSXML.children().length;j++){
+                        if($(tmpRHSXML).children()[j].tagName == singleNode){
+                            tmpRHSXML = $($(tmpRHSXML).children()[j]);
+                            nodeIdentifiedFalg=true;
+                            break;
+                        }
+                    }
+                    if (!nodeIdentifiedFalg){
+                        return {ruleExecutionResult:"Business Exception",ruleExecutionComment:"Node "+singleNode+" not found in RHS XML while navigating the path"}
+                    }
+                }
+                // Check if the final nodes have any further children, if no then mark it as execption
+                if(tmpLHSXML.children().length == 0) return {ruleExecutionResult:"Business Exception",ruleExecutionComment:"END Node of LHS XML do not have more nodes. Hence Array based comparison cannot be done"};
+                if(tmpRHSXML.children().length == 0) return {ruleExecutionResult:"Business Exception",ruleExecutionComment:"END Node of RHS XML do not have more nodes. Hence Array based comparison cannot be done"};
+
+                //All Ok Start performing Array Based Comparison
+
+
+            }
+
+            function XMLCompareValues(customPath){
+                var splitSingleNode = customPath.split("->");
+                var tmpLHSXML = LHSXML;
+                var tmpRHSXML = RHSXML;
+                for(var i=0;i<splitSingleNode.length;i++){
+                    var singleNode = splitSingleNode[i];
+                    var nodeIdentifiedFalg = false;
+                    for(var j=0;j<tmpLHSXML.children().length;j++){
+                        if($(tmpLHSXML).children()[j].tagName == singleNode){
+                            tmpLHSXML = $($(tmpLHSXML).children()[j]);
+                            nodeIdentifiedFalg=true;
+                            break;
+                        }
+                    }
+                    if (!nodeIdentifiedFalg){
+                        return {ruleExecutionResult:"Business Exception",ruleExecutionComment:"Node "+singleNode+" not found in LHS XML while navigating the path"}
+                    }
+                    nodeIdentifiedFalg = false;
+                    for(j=0;j<tmpRHSXML.children().length;j++){
+                        if($(tmpRHSXML).children()[j].tagName == singleNode){
+                            tmpRHSXML = $($(tmpRHSXML).children()[j]);
+                            nodeIdentifiedFalg=true;
+                            break;
+                        }
+                    }
+                    if (!nodeIdentifiedFalg){
+                        return {ruleExecutionResult:"Business Exception",ruleExecutionComment:"Node "+singleNode+" not found in RHS XML while navigating the path"}
+                    }
+                }
+
+                // Check if the final nodes have any further children, if yes then mark it as execption
+                if(tmpLHSXML.children().length != 0) return {ruleExecutionResult:"Business Exception",ruleExecutionComment:"END Node of LHS XML have more nodes. Hence Value based comparison cannot be done"};
+                if(tmpRHSXML.children().length != 0) return {ruleExecutionResult:"Business Exception",ruleExecutionComment:"END Node of RHS XML have more nodes. Hence Value based comparison cannot be done"};
+
+                if(tmpLHSXML.text() == tmpRHSXML.text()){
+                    return {ruleExecutionResult:"PASS",ruleExecutionComment:"LHS XML and RHS XML values matched successfully =="+tmpLHSXML.text()+"=="};
+                } else {
+                    return {ruleExecutionResult:"FAIL",ruleExecutionComment:"Assertion Failure : LHS XML value =="+tmpLHSXML.text()+"== and RHS XML value =="+tmpRHSXML.text()+"== not matched"};
+                }
+
+            }
+
+            function XMLCompareArray(customArray){
+                var responeObj = {ruleExecutionResult:"",ruleExecutionComment:""};
+            }
+
+            $.each(rules_line_by_line, function(k){
+                var singleRule = rules_line_by_line[k];
+                var ruleExecutionResult = "";
+                var ruleExecutionComment = "";
+                try {
+                    var ruleExecution = ParseRule(singleRule);
+                    ruleExecutionResult = ruleExecution.ruleExecutionResult;
+                    ruleExecutionComment = ruleExecution.ruleExecutionComment;
+                }
+                catch(err) {
+                    ruleExecutionResult = "EXCEPTION";
+                    ruleExecutionComment = err.message;
+                }
+                if(ruleExecutionResult=="PASS"){
+                    RESULT.append("<br /><hr /><br />");
+                    RESULT.append("<span style='color: green'>"+singleRule+" ===>>> Execution Status : "+ruleExecutionResult+" || Execution Comments : "+ruleExecutionComment+"</span>")
+                } else if (ruleExecutionResult=="Fail"){
+                    RESULT.append("<br /><hr /><br />");
+                    RESULT.append("<span style='color: red'>"+singleRule+" ===>>> Execution Status : "+ruleExecutionResult+" || Execution Comments : "+ruleExecutionComment+"</span>")
+                }
+                else if (ruleExecutionResult=="EXCEPTION"){
+                    RESULT.append("<br /><hr /><br />");
+                    RESULT.append("<span style='color: orangered'>"+singleRule+" ===>>> Execution Status : "+ruleExecutionResult+" || Execution Comments : "+ruleExecutionComment+"</span>")
+                }
+                else {
+                    RESULT.append("<br /><hr /><br />");
+                    RESULT.append("<span style='color: orange'>"+singleRule+" ===>>> Execution Status : "+ruleExecutionResult+" || Execution Comments : "+ruleExecutionComment+"</span>")
+                }
+            });
+        }
+
+    </script>
 </body>
 </html>
