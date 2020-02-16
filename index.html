@@ -78,7 +78,7 @@
                 return responeObj;
             }
 
-            function XMLComareArray(customPath){
+            function XMLCompareArray(customPath){
                 var splitSingleNode = customPath.split("->");
                 var tmpLHSXML = LHSXML;
                 var tmpRHSXML = RHSXML;
@@ -114,9 +114,67 @@
                 if(tmpLHSXML.children().length == 0) return {ruleExecutionResult:"Business Exception",ruleExecutionComment:"END Node of LHS XML do not have more nodes. Hence Array based comparison cannot be done"};
                 if(tmpRHSXML.children().length == 0) return {ruleExecutionResult:"Business Exception",ruleExecutionComment:"END Node of RHS XML do not have more nodes. Hence Array based comparison cannot be done"};
 
+                //Convert XML to Array
+                tmpLHSXML = tmpLHSXML.children().toArray();
+                tmpRHSXML = tmpRHSXML.children().toArray();
                 //All Ok Start performing Array Based Comparison
+                var assertionFailureMessage = "";
+                for(i=0;i<tmpLHSXML.length;i++){
+                    nodeIdentifiedFalg = false;
+                    var singleTmpLHSXML = $(tmpLHSXML[i]);
+                    for(j=0;j<tmpRHSXML.length;j++){
+                        var singleTmpRHSXML = $(tmpRHSXML[j]);
+                        if(CompareXMLObject(singleTmpLHSXML,singleTmpRHSXML)){
+                            nodeIdentifiedFalg = true;
+                            tmpRHSXML.splice(j,1);
+                            break;
+                        }
+                    }
+                    if(! nodeIdentifiedFalg){
+                        assertionFailureMessage = assertionFailureMessage + "<br /><br />LSH Node Not Found in RHS : " + singleTmpLHSXML.html().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+                    }
+                }
+                //Now check if anything is left in tmpRHSXML. If yes then Iterate and update exception message.
+                for(i=0;i<tmpRHSXML.length;i++){
+                    assertionFailureMessage = assertionFailureMessage + "<br /><br />RHS Node Not Found in LHS : " + $(tmpRHSXML[i]).html().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+                }
+                if(assertionFailureMessage==""){
+                    return {ruleExecutionResult:"PASS",ruleExecutionComment:"All LHS XML and RHS XML objects matched successfully."};
+                } else {
+                    return {ruleExecutionResult:"FAIL",ruleExecutionComment:"Assertion Failure : Mismatch Identified. See Below Logs For Details"+assertionFailureMessage};
+                }
 
+            }
 
+            function CompareXMLObject(LHSObj,RHSObj){
+                var tmpLHSObj = LHSObj.clone();
+                var tmpRHSObj = RHSObj.clone();
+                var nodeIdentifiedFalg = false;
+                for(var i=0;i<tmpLHSObj.children().length;i++){
+                    nodeIdentifiedFalg = false;
+                    for(var j=0;j<tmpRHSObj.children().length;j++){
+                        if($(tmpLHSObj.children()[i]).children().length==0 && $(tmpRHSObj.children()[i]).children().length==0 && tmpLHSObj.children()[i].tagName == tmpRHSObj.children()[i].tagName && tmpLHSObj.children()[i].innerHTML == tmpRHSObj.children()[i].innerHTML){
+                            nodeIdentifiedFalg = true;
+                            break;
+                        }
+                    }
+                    if(!nodeIdentifiedFalg){
+                        return false;
+                    }
+                }
+                for(var i=0;i<tmpRHSObj.children().length;i++){
+                    nodeIdentifiedFalg = false;
+                    for(var j=0;j<tmpLHSObj.children().length;j++){
+                        if($(tmpLHSObj.children()[i]).children().length==0 && $(tmpRHSObj.children()[i]).children().length==0 && tmpLHSObj.children()[i].tagName == tmpRHSObj.children()[i].tagName && tmpLHSObj.children()[i].innerHTML == tmpRHSObj.children()[i].innerHTML){
+                            nodeIdentifiedFalg = true;
+                            break;
+                        }
+                    }
+                    if(!nodeIdentifiedFalg){
+                        return false;
+                    }
+                }
+                return true;
             }
 
             function XMLCompareValues(customPath){
@@ -158,11 +216,6 @@
                 } else {
                     return {ruleExecutionResult:"FAIL",ruleExecutionComment:"Assertion Failure : LHS XML value =="+tmpLHSXML.text()+"== and RHS XML value =="+tmpRHSXML.text()+"== not matched"};
                 }
-
-            }
-
-            function XMLCompareArray(customArray){
-                var responeObj = {ruleExecutionResult:"",ruleExecutionComment:""};
             }
 
             $.each(rules_line_by_line, function(k){
