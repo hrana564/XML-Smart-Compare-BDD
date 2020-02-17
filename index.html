@@ -3,10 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <title>XML Compare</title>
-    <script src="https://code.jquery.com/jquery-3.4.1.js" integrity="sha256-WpOohJOqMqqyKL9FccASB9O0KwACQJpFTUBLTYOVvVU=" crossorigin="anonymous"></script>
-    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css">
-    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
-    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js"></script>
+    <script src="./scripts/jquery-3.4.1.js" ></script>
+    <link rel="stylesheet" href="./style/bootstrap.css">
+    <script src="./scripts/bootstrap.js"></script>
+
+    <script src="LHS_XML.js"></script>
+    <script src="RHS_XML.js"></script>
+    <script src="RULES.js"></script>
 </head>
 <body>
     <div>
@@ -33,190 +36,55 @@
             </tr>
         </table>
     </div>
+    <br /><hr /><br />
+    <div id="summary">
+        <span style="color: green" id="summaryPass">Pass : <span id="summaryPassCount">0</span> </span> <br />
+        <span style="color: red" id="summaryFail">Fail : <span id="summaryFailCount">0</span></span> <br />
+        <span style="color: orangered" id="summaryTechnicalException">Technical Exception : <span id="summaryTechnicalExceptionCount">0</span></span> <br />
+        <span style="color: blue" id="summaryBusinessException">Business Exception : <span id="summaryBusinessExceptionCount">0</span></span> <br />
+        <span style="color: brown" id="summaryOthers">Others : <span id="summaryOthersCount">0</span></span> <br />
+    </div>
+    <br /><hr /><br />
+
+    <input type="checkbox" id="summaryPassCKBX" checked onchange="WriteResultsOnScreen()"> Pass |
+    <input type="checkbox" id="summaryFailCKBX" checked onchange="WriteResultsOnScreen()"> Fail |
+    <input type="checkbox" id="summaryTechnicalExceptionCKBX" checked onchange="WriteResultsOnScreen()"> Technical Exception |
+    <input type="checkbox" id="summaryBusinessExceptionCKBX" checked onchange="WriteResultsOnScreen()"> Business Exception |
+    <input type="checkbox" id="summaryOthersCKBX" checked onchange="WriteResultsOnScreen()"> Others
+
+    <br /><hr /><br />
     <div id="result">
 
     </div>
     <script>
 
+
+        $('#inputText1')[0].value = userInputLHSXML.trim();
+        $('#inputText2')[0].value = userInputRHSXML.trim();
+        $('#inputText0')[0].value = userInputRules.trim();
+
         function GetPosition(string, subString, index) {
             return string.split(subString, index).join(subString).length;
         }
 
+        var LHSXML = "";
+        var RHSXML = "";
+        var RULES = "";
+        var RESULT = $('#result');
+
+        comparisonResults = [];
+
         function PerformComparison(){
-            var LHSXML = $('#inputText1')[0].value;
-            var RHSXML = $('#inputText2')[0].value;
-            var RULES = $('#inputText0')[0].value;
+            comparisonResults = [];
+            LHSXML = $('#inputText1')[0].value;
+            RHSXML = $('#inputText2')[0].value;
+            RULES = $('#inputText0')[0].value;
 
             parser = new DOMParser();
             LHSXML = $(parser.parseFromString(LHSXML,"text/xml"));
             RHSXML = $(parser.parseFromString(RHSXML,"text/xml"));
 
-            var RESULT = $('#result');
-
-            RESULT.html("");
-
             var rules_line_by_line = RULES.split("\n");
-
-
-
-            function ParseRule(rule){
-                var responeObj = {ruleExecutionResult:"",ruleExecutionComment:""};
-                try{
-                    var parameter1 = rule.substring(GetPosition(rule,"\"",1)+1,GetPosition(rule,"\"",2));
-                    if(rule.indexOf("Compare Value \"")==0){
-                        responeObj = XMLCompareValues(parameter1);
-                    }
-                    else if (rule.indexOf("Compare Array \"")==0){
-                        responeObj = XMLCompareArray(parameter1);
-                    }
-                    else{
-                        responeObj = {ruleExecutionResult:"No Rule Found Exception",ruleExecutionComment:"No Rule Matached. Please check for syntax errors."};
-                    }
-                }catch(err) {
-                    responeObj = {ruleExecutionResult:"Rule Execution Exception",ruleExecutionComment:err.message};
-                }
-                return responeObj;
-            }
-
-            function XMLCompareArray(customPath){
-                var splitSingleNode = customPath.split("->");
-                var tmpLHSXML = LHSXML;
-                var tmpRHSXML = RHSXML;
-                for(var i=0;i<splitSingleNode.length;i++) {
-                    var singleNode = splitSingleNode[i];
-                    var nodeIdentifiedFalg = false;
-                    for (var j = 0; j < tmpLHSXML.children().length; j++) {
-                        if ($(tmpLHSXML).children()[j].tagName == singleNode) {
-                            tmpLHSXML = $($(tmpLHSXML).children()[j]);
-                            nodeIdentifiedFalg = true;
-                            break;
-                        }
-                    }
-                    if (!nodeIdentifiedFalg) {
-                        return {
-                            ruleExecutionResult: "Business Exception",
-                            ruleExecutionComment: "Node " + singleNode + " not found in LHS XML while navigating the path"
-                        }
-                    }
-                    nodeIdentifiedFalg = false;
-                    for(j=0;j<tmpRHSXML.children().length;j++){
-                        if($(tmpRHSXML).children()[j].tagName == singleNode){
-                            tmpRHSXML = $($(tmpRHSXML).children()[j]);
-                            nodeIdentifiedFalg=true;
-                            break;
-                        }
-                    }
-                    if (!nodeIdentifiedFalg){
-                        return {ruleExecutionResult:"Business Exception",ruleExecutionComment:"Node "+singleNode+" not found in RHS XML while navigating the path"}
-                    }
-                }
-                // Check if the final nodes have any further children, if no then mark it as execption
-                if(tmpLHSXML.children().length == 0) return {ruleExecutionResult:"Business Exception",ruleExecutionComment:"END Node of LHS XML do not have more nodes. Hence Array based comparison cannot be done"};
-                if(tmpRHSXML.children().length == 0) return {ruleExecutionResult:"Business Exception",ruleExecutionComment:"END Node of RHS XML do not have more nodes. Hence Array based comparison cannot be done"};
-
-                //Convert XML to Array
-                tmpLHSXML = tmpLHSXML.children().toArray();
-                tmpRHSXML = tmpRHSXML.children().toArray();
-                //All Ok Start performing Array Based Comparison
-                var assertionFailureMessage = "";
-                for(i=0;i<tmpLHSXML.length;i++){
-                    nodeIdentifiedFalg = false;
-                    var singleTmpLHSXML = $(tmpLHSXML[i]);
-                    for(j=0;j<tmpRHSXML.length;j++){
-                        var singleTmpRHSXML = $(tmpRHSXML[j]);
-                        if(CompareXMLObject(singleTmpLHSXML,singleTmpRHSXML)){
-                            nodeIdentifiedFalg = true;
-                            tmpRHSXML.splice(j,1);
-                            break;
-                        }
-                    }
-                    if(! nodeIdentifiedFalg){
-                        assertionFailureMessage = assertionFailureMessage + "<br /><br />LSH Node Not Found in RHS : " + singleTmpLHSXML.html().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-                    }
-                }
-                //Now check if anything is left in tmpRHSXML. If yes then Iterate and update exception message.
-                for(i=0;i<tmpRHSXML.length;i++){
-                    assertionFailureMessage = assertionFailureMessage + "<br /><br />RHS Node Not Found in LHS : " + $(tmpRHSXML[i]).html().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-                }
-                if(assertionFailureMessage==""){
-                    return {ruleExecutionResult:"PASS",ruleExecutionComment:"All LHS XML and RHS XML objects matched successfully."};
-                } else {
-                    return {ruleExecutionResult:"FAIL",ruleExecutionComment:"Assertion Failure : Mismatch Identified. See Below Logs For Details"+assertionFailureMessage};
-                }
-
-            }
-
-            function CompareXMLObject(LHSObj,RHSObj){
-                var tmpLHSObj = LHSObj.clone();
-                var tmpRHSObj = RHSObj.clone();
-                var nodeIdentifiedFalg = false;
-                for(var i=0;i<tmpLHSObj.children().length;i++){
-                    nodeIdentifiedFalg = false;
-                    for(var j=0;j<tmpRHSObj.children().length;j++){
-                        if($(tmpLHSObj.children()[i]).children().length==0 && $(tmpRHSObj.children()[i]).children().length==0 && tmpLHSObj.children()[i].tagName == tmpRHSObj.children()[i].tagName && tmpLHSObj.children()[i].innerHTML == tmpRHSObj.children()[i].innerHTML){
-                            nodeIdentifiedFalg = true;
-                            break;
-                        }
-                    }
-                    if(!nodeIdentifiedFalg){
-                        return false;
-                    }
-                }
-                for(var i=0;i<tmpRHSObj.children().length;i++){
-                    nodeIdentifiedFalg = false;
-                    for(var j=0;j<tmpLHSObj.children().length;j++){
-                        if($(tmpLHSObj.children()[i]).children().length==0 && $(tmpRHSObj.children()[i]).children().length==0 && tmpLHSObj.children()[i].tagName == tmpRHSObj.children()[i].tagName && tmpLHSObj.children()[i].innerHTML == tmpRHSObj.children()[i].innerHTML){
-                            nodeIdentifiedFalg = true;
-                            break;
-                        }
-                    }
-                    if(!nodeIdentifiedFalg){
-                        return false;
-                    }
-                }
-                return true;
-            }
-
-            function XMLCompareValues(customPath){
-                var splitSingleNode = customPath.split("->");
-                var tmpLHSXML = LHSXML;
-                var tmpRHSXML = RHSXML;
-                for(var i=0;i<splitSingleNode.length;i++){
-                    var singleNode = splitSingleNode[i];
-                    var nodeIdentifiedFalg = false;
-                    for(var j=0;j<tmpLHSXML.children().length;j++){
-                        if($(tmpLHSXML).children()[j].tagName == singleNode){
-                            tmpLHSXML = $($(tmpLHSXML).children()[j]);
-                            nodeIdentifiedFalg=true;
-                            break;
-                        }
-                    }
-                    if (!nodeIdentifiedFalg){
-                        return {ruleExecutionResult:"Business Exception",ruleExecutionComment:"Node "+singleNode+" not found in LHS XML while navigating the path"}
-                    }
-                    nodeIdentifiedFalg = false;
-                    for(j=0;j<tmpRHSXML.children().length;j++){
-                        if($(tmpRHSXML).children()[j].tagName == singleNode){
-                            tmpRHSXML = $($(tmpRHSXML).children()[j]);
-                            nodeIdentifiedFalg=true;
-                            break;
-                        }
-                    }
-                    if (!nodeIdentifiedFalg){
-                        return {ruleExecutionResult:"Business Exception",ruleExecutionComment:"Node "+singleNode+" not found in RHS XML while navigating the path"}
-                    }
-                }
-
-                // Check if the final nodes have any further children, if yes then mark it as execption
-                if(tmpLHSXML.children().length != 0) return {ruleExecutionResult:"Business Exception",ruleExecutionComment:"END Node of LHS XML have more nodes. Hence Value based comparison cannot be done"};
-                if(tmpRHSXML.children().length != 0) return {ruleExecutionResult:"Business Exception",ruleExecutionComment:"END Node of RHS XML have more nodes. Hence Value based comparison cannot be done"};
-
-                if(tmpLHSXML.text() == tmpRHSXML.text()){
-                    return {ruleExecutionResult:"PASS",ruleExecutionComment:"LHS XML and RHS XML values matched successfully =="+tmpLHSXML.text()+"=="};
-                } else {
-                    return {ruleExecutionResult:"FAIL",ruleExecutionComment:"Assertion Failure : LHS XML value =="+tmpLHSXML.text()+"== and RHS XML value =="+tmpRHSXML.text()+"== not matched"};
-                }
-            }
 
             $.each(rules_line_by_line, function(k){
                 var singleRule = rules_line_by_line[k];
@@ -228,25 +96,226 @@
                     ruleExecutionComment = ruleExecution.ruleExecutionComment;
                 }
                 catch(err) {
-                    ruleExecutionResult = "EXCEPTION";
+                    ruleExecutionResult = "Technical Exception";
                     ruleExecutionComment = err.message;
                 }
-                if(ruleExecutionResult=="PASS"){
-                    RESULT.append("<br /><hr /><br />");
-                    RESULT.append("<span style='color: green'>"+singleRule+" ===>>> Execution Status : "+ruleExecutionResult+" || Execution Comments : "+ruleExecutionComment+"</span>")
-                } else if (ruleExecutionResult=="Fail"){
-                    RESULT.append("<br /><hr /><br />");
-                    RESULT.append("<span style='color: red'>"+singleRule+" ===>>> Execution Status : "+ruleExecutionResult+" || Execution Comments : "+ruleExecutionComment+"</span>")
+                comparisonResults.push({'ruleExecuted':singleRule,'ruleExecutionResult':ruleExecutionResult,'ruleExecutionComment':ruleExecutionComment});
+            });
+
+            WriteResultsOnScreen();
+        }
+
+        function WriteResultsOnScreen(){
+
+            //Write Count on Screen
+            var countPass = 0;
+            var countFail = 0;
+            var countTechnicalFailure = 0;
+            var countBusinessException = 0;
+            var countOthers = 0;
+
+            RESULT.html("");
+            $.each(comparisonResults, function(k) {
+                var singleComparisonResults = comparisonResults[k];
+                if(singleComparisonResults.ruleExecutionResult=="PASS"){
+                    countPass++;
+                    if($('#summaryPassCKBX')[0].checked){
+                        RESULT.append("<br /><hr /><br />");
+                        RESULT.append("<span style='color: green'>"+singleComparisonResults.ruleExecuted+" ===>>> Execution Status : "+singleComparisonResults.ruleExecutionResult+" || Execution Comments : "+singleComparisonResults.ruleExecutionComment+"</span>")
+                    }
+                } else if (singleComparisonResults.ruleExecutionResult=="FAIL"){
+                    countFail++;
+                    if($('#summaryFailCKBX')[0].checked){
+                        RESULT.append("<br /><hr /><br />");
+                        RESULT.append("<span style='color: red'>"+singleComparisonResults.ruleExecuted+" ===>>> Execution Status : "+singleComparisonResults.ruleExecutionResult+" || Execution Comments : "+singleComparisonResults.ruleExecutionComment+"</span>")
+                    }
                 }
-                else if (ruleExecutionResult=="EXCEPTION"){
-                    RESULT.append("<br /><hr /><br />");
-                    RESULT.append("<span style='color: orangered'>"+singleRule+" ===>>> Execution Status : "+ruleExecutionResult+" || Execution Comments : "+ruleExecutionComment+"</span>")
+                else if (singleComparisonResults.ruleExecutionResult=="Technical Exception"){
+                    countTechnicalFailure++;
+                    if($('#summaryTechnicalExceptionCKBX')[0].checked){
+                        RESULT.append("<br /><hr /><br />");
+                        RESULT.append("<span style='color: orangered'>"+singleComparisonResults.ruleExecuted+" ===>>> Execution Status : "+singleComparisonResults.ruleExecutionResult+" || Execution Comments : "+singleComparisonResults.ruleExecutionComment+"</span>")
+                    }
                 }
-                else {
-                    RESULT.append("<br /><hr /><br />");
-                    RESULT.append("<span style='color: orange'>"+singleRule+" ===>>> Execution Status : "+ruleExecutionResult+" || Execution Comments : "+ruleExecutionComment+"</span>")
+                else if (singleComparisonResults.ruleExecutionResult=="Business Exception"){
+                    countBusinessException++;
+                    if($('#summaryBusinessExceptionCKBX')[0].checked){
+                        RESULT.append("<br /><hr /><br />");
+                        RESULT.append("<span style='color: blue'>"+singleComparisonResults.ruleExecuted+" ===>>> Execution Status : "+singleComparisonResults.ruleExecutionResult+" || Execution Comments : "+singleComparisonResults.ruleExecutionComment+"</span>")
+                    }
+                }
+                else{
+                    countOthers++;
+                    if ($('#summaryOthersCKBX')[0].checked){
+                        RESULT.append("<br /><hr /><br />");
+                        RESULT.append("<span style='color: brown'>"+singleComparisonResults.ruleExecuted+" ===>>> Execution Status : "+singleComparisonResults.ruleExecutionResult+" || Execution Comments : "+singleComparisonResults.ruleExecutionComment+"</span>");
+                    }
                 }
             });
+            $('#summaryPassCount')[0].innerHTML = countPass;
+            $('#summaryFailCount')[0].innerHTML = countFail;
+            $('#summaryTechnicalExceptionCount')[0].innerHTML = countTechnicalFailure;
+            $('#summaryBusinessExceptionCount')[0].innerHTML = countBusinessException;
+            $('#summaryOthersCount')[0].innerHTML = countOthers;
+        }
+
+        function ParseRule(rule){
+            var responeObj = {ruleExecutionResult:"",ruleExecutionComment:""};
+            try{
+                var parameter1 = rule.substring(GetPosition(rule,"\"",1)+1,GetPosition(rule,"\"",2));
+                if(rule.indexOf("Compare Value \"")==0){
+                    responeObj = XMLCompareValues(parameter1);
+                }
+                else if (rule.indexOf("Compare Array \"")==0){
+                    responeObj = XMLCompareArray(parameter1);
+                }
+                else{
+                    responeObj = {ruleExecutionResult:"Business Exception",ruleExecutionComment:"No Rule Matached. Please check for syntax errors."};
+                }
+            }catch(err) {
+                responeObj = {ruleExecutionResult:"Technical Exception",ruleExecutionComment:err.message};
+            }
+            return responeObj;
+        }
+
+        function XMLCompareArray(customPath){
+            var splitSingleNode = customPath.split("->");
+            var tmpLHSXML = LHSXML;
+            var tmpRHSXML = RHSXML;
+            for(var i=0;i<splitSingleNode.length;i++) {
+                var singleNode = splitSingleNode[i];
+                var nodeIdentifiedFalg = false;
+                for (var j = 0; j < tmpLHSXML.children().length; j++) {
+                    if ($(tmpLHSXML).children()[j].tagName == singleNode) {
+                        tmpLHSXML = $($(tmpLHSXML).children()[j]);
+                        nodeIdentifiedFalg = true;
+                        break;
+                    }
+                }
+                if (!nodeIdentifiedFalg) {
+                    return {
+                        ruleExecutionResult: "Business Exception",
+                        ruleExecutionComment: "Node " + singleNode + " not found in LHS XML while navigating the path"
+                    }
+                }
+                nodeIdentifiedFalg = false;
+                for(j=0;j<tmpRHSXML.children().length;j++){
+                    if($(tmpRHSXML).children()[j].tagName == singleNode){
+                        tmpRHSXML = $($(tmpRHSXML).children()[j]);
+                        nodeIdentifiedFalg=true;
+                        break;
+                    }
+                }
+                if (!nodeIdentifiedFalg){
+                    return {ruleExecutionResult:"Business Exception",ruleExecutionComment:"Node "+singleNode+" not found in RHS XML while navigating the path"}
+                }
+            }
+            // Check if the final nodes have any further children, if no then mark it as execption
+            if(tmpLHSXML.children().length == 0) return {ruleExecutionResult:"Business Exception",ruleExecutionComment:"END Node of LHS XML do not have more nodes. Hence Array based comparison cannot be done"};
+            if(tmpRHSXML.children().length == 0) return {ruleExecutionResult:"Business Exception",ruleExecutionComment:"END Node of RHS XML do not have more nodes. Hence Array based comparison cannot be done"};
+
+            //Convert XML to Array
+            tmpLHSXML = tmpLHSXML.children().toArray();
+            tmpRHSXML = tmpRHSXML.children().toArray();
+            //All Ok Start performing Array Based Comparison
+            var assertionFailureMessage = "";
+            for(i=0;i<tmpLHSXML.length;i++){
+                nodeIdentifiedFalg = false;
+                var singleTmpLHSXML = $(tmpLHSXML[i]);
+                for(j=0;j<tmpRHSXML.length;j++){
+                    var singleTmpRHSXML = $(tmpRHSXML[j]);
+                    if(CompareXMLObject(singleTmpLHSXML,singleTmpRHSXML)){
+                        nodeIdentifiedFalg = true;
+                        tmpRHSXML.splice(j,1);
+                        break;
+                    }
+                }
+                if(! nodeIdentifiedFalg){
+                    assertionFailureMessage = assertionFailureMessage + "<br /><br />LSH Node Not Found in RHS : " + singleTmpLHSXML.html().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+                }
+            }
+            //Now check if anything is left in tmpRHSXML. If yes then Iterate and update exception message.
+            for(i=0;i<tmpRHSXML.length;i++){
+                assertionFailureMessage = assertionFailureMessage + "<br /><br />RHS Node Not Found in LHS : " + $(tmpRHSXML[i]).html().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+            }
+            if(assertionFailureMessage==""){
+                return {ruleExecutionResult:"PASS",ruleExecutionComment:"All LHS XML and RHS XML objects matched successfully."};
+            } else {
+                return {ruleExecutionResult:"FAIL",ruleExecutionComment:"Assertion Failure : Mismatch Identified. See Below Logs For Details"+assertionFailureMessage};
+            }
+
+        }
+
+        function CompareXMLObject(LHSObj,RHSObj){
+            var tmpLHSObj = LHSObj.clone();
+            var tmpRHSObj = RHSObj.clone();
+            var nodeIdentifiedFalg = false;
+            for(var i=0;i<tmpLHSObj.children().length;i++){
+                nodeIdentifiedFalg = false;
+                for(var j=0;j<tmpRHSObj.children().length;j++){
+                    if($(tmpLHSObj.children()[i]).children().length==0 && $(tmpRHSObj.children()[i]).children().length==0 && tmpLHSObj.children()[i].tagName == tmpRHSObj.children()[i].tagName && tmpLHSObj.children()[i].innerHTML == tmpRHSObj.children()[i].innerHTML){
+                        nodeIdentifiedFalg = true;
+                        break;
+                    }
+                }
+                if(!nodeIdentifiedFalg){
+                    return false;
+                }
+            }
+            for(var i=0;i<tmpRHSObj.children().length;i++){
+                nodeIdentifiedFalg = false;
+                for(var j=0;j<tmpLHSObj.children().length;j++){
+                    if($(tmpLHSObj.children()[i]).children().length==0 && $(tmpRHSObj.children()[i]).children().length==0 && tmpLHSObj.children()[i].tagName == tmpRHSObj.children()[i].tagName && tmpLHSObj.children()[i].innerHTML == tmpRHSObj.children()[i].innerHTML){
+                        nodeIdentifiedFalg = true;
+                        break;
+                    }
+                }
+                if(!nodeIdentifiedFalg){
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        function XMLCompareValues(customPath){
+            var splitSingleNode = customPath.split("->");
+            var tmpLHSXML = LHSXML;
+            var tmpRHSXML = RHSXML;
+            for(var i=0;i<splitSingleNode.length;i++){
+                var singleNode = splitSingleNode[i];
+                var nodeIdentifiedFalg = false;
+                for(var j=0;j<tmpLHSXML.children().length;j++){
+                    if($(tmpLHSXML).children()[j].tagName == singleNode){
+                        tmpLHSXML = $($(tmpLHSXML).children()[j]);
+                        nodeIdentifiedFalg=true;
+                        break;
+                    }
+                }
+                if (!nodeIdentifiedFalg){
+                    return {ruleExecutionResult:"Business Exception",ruleExecutionComment:"Node "+singleNode+" not found in LHS XML while navigating the path"}
+                }
+                nodeIdentifiedFalg = false;
+                for(j=0;j<tmpRHSXML.children().length;j++){
+                    if($(tmpRHSXML).children()[j].tagName == singleNode){
+                        tmpRHSXML = $($(tmpRHSXML).children()[j]);
+                        nodeIdentifiedFalg=true;
+                        break;
+                    }
+                }
+                if (!nodeIdentifiedFalg){
+                    return {ruleExecutionResult:"Business Exception",ruleExecutionComment:"Node "+singleNode+" not found in RHS XML while navigating the path"}
+                }
+            }
+
+            // Check if the final nodes have any further children, if yes then mark it as execption
+            if(tmpLHSXML.children().length != 0) return {ruleExecutionResult:"Business Exception",ruleExecutionComment:"END Node of LHS XML have more nodes. Hence Value based comparison cannot be done"};
+            if(tmpRHSXML.children().length != 0) return {ruleExecutionResult:"Business Exception",ruleExecutionComment:"END Node of RHS XML have more nodes. Hence Value based comparison cannot be done"};
+
+            if(tmpLHSXML.text() == tmpRHSXML.text()){
+                return {ruleExecutionResult:"PASS",ruleExecutionComment:"LHS XML and RHS XML values matched successfully =="+tmpLHSXML.text()+"=="};
+            } else {
+                return {ruleExecutionResult:"FAIL",ruleExecutionComment:"Assertion Failure : LHS XML value =="+tmpLHSXML.text()+"== and RHS XML value =="+tmpRHSXML.text()+"== not matched"};
+            }
         }
 
     </script>
